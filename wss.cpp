@@ -13,6 +13,7 @@ extern "C"
 
 struct Record
 {
+	void* mIP = nullptr;
 	void* mAddr = nullptr;
 };
 
@@ -59,12 +60,14 @@ void EarlyExit()
 void RecordMemRead(void* ip, void* addr)
 {
 	Record& record = reads[ridx++];
+	record.mIP = ip;
 	record.mAddr = addr;
 }
 
 void RecordMemWrite(void* ip, void* addr)
 {
 	Record& record = writes[widx++];
+	record.mIP = ip;
 	record.mAddr = addr;
 }
 
