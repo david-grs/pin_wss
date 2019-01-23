@@ -2,7 +2,6 @@
 
 #include <cstdint>
 #include <iostream>
-#include <algorithm>
 #include <unordered_set>
 #include <sstream>
 
@@ -11,23 +10,22 @@ extern "C"
 #include <unistd.h>
 }
 
-struct Record
+struct AddrRecord
 {
-	void* mIP = nullptr;
 	void* mAddr = nullptr;
 };
 
 static const std::size_t MaxRecords = 256 * 1024 * 1024;
 static const std::size_t MaxInstructions = 4000000000ULL;
 
-Record *reads = nullptr;
-Record *writes = nullptr;
+AddrRecord *reads = nullptr;
+AddrRecord *writes = nullptr;
 std::size_t insn = 0;
 std::size_t ridx = 0;
 std::size_t widx = 0;
 int stdoutfd;
 
-void PrintWSS(const char* reason)
+void PrintWSS(const char* reason = "")
 {
 	std::ostringstream oss;
 	oss << reason << std::endl
@@ -57,17 +55,15 @@ void EarlyExit()
 	PIN_Detach();
 }
 
-void RecordMemRead(void* ip, void* addr)
+void RecordMemRead(void* addr)
 {
-	Record& record = reads[ridx++];
-	record.mIP = ip;
+	AddrRecord& record = reads[ridx++];
 	record.mAddr = addr;
 }
 
-void RecordMemWrite(void* ip, void* addr)
+void RecordMemWrite(void* addr)
 {
-	Record& record = writes[widx++];
-	record.mIP = ip;
+	AddrRecord& record = writes[widx++];
 	record.mAddr = addr;
 }
 
@@ -76,9 +72,9 @@ ADDRINT CountDown()
 	return insn == MaxInstructions || widx == MaxRecords || ridx == MaxRecords;
 }
 
-void Instruction(INS ins, void*v)
+void Instruction(INS ins, void*)
 {
-	UINT32 memOperands = INS_MemoryOperandCount(ins);
+	const UINT32 memOperands = INS_MemoryOperandCount(ins);
 
 	for (UINT32 memOp = 0; memOp < memOperands; memOp++)
 	{
@@ -89,10 +85,10 @@ void Instruction(INS ins, void*v)
 
 			INS_InsertPredicatedCall(
 			    ins, IPOINT_BEFORE, (AFUNPTR)RecordMemRead,
-			    IARG_INST_PTR,
 			    IARG_MEMORYOP_EA, memOp,
 			    IARG_END);
 		}
+
 		if (INS_MemoryOperandIsWritten(ins, memOp))
 		{
 			INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)CountDown, IARG_END);
@@ -100,7 +96,6 @@ void Instruction(INS ins, void*v)
 
 			INS_InsertPredicatedCall(
 			    ins, IPOINT_BEFORE, (AFUNPTR)RecordMemWrite,
-			    IARG_INST_PTR,
 			    IARG_MEMORYOP_EA, memOp,
 			    IARG_END);
 		}
@@ -122,7 +117,7 @@ VOID Trace(TRACE trace, VOID*)
 
 void Fini(INT32, void*)
 {
-	PrintWSS("exit");
+	PrintWSS();
 }
 
 int main(int argc, char *argv[])
@@ -134,8 +129,8 @@ int main(int argc, char *argv[])
 	}
 
 	stdoutfd = ::dup(1);
-	reads = new Record[MaxRecords];
-	writes = new Record[MaxRecords];
+	reads = new AddrRecord[MaxRecords];
+	writes = new AddrRecord[MaxRecords];
 
 	TRACE_AddInstrumentFunction(Trace, 0);
 	INS_AddInstrumentFunction(Instruction, 0);
