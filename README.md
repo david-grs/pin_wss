@@ -1,7 +1,10 @@
-WSS (working set size) estimator
---------------------------------
+Pin Tools: WSS, memstats
+------------------------
 
 ### Build
+```
+$ PIN_ROOT=~/src/pin-3.7-97619-g0d0c92f4f-gcc-linux/ make
+```
 
 ### wss
 ```
