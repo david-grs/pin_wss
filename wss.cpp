@@ -80,7 +80,6 @@ void Instruction(INS ins, void*v)
 {
 	UINT32 memOperands = INS_MemoryOperandCount(ins);
 
-	// Iterate over each memory operand of the instruction.
 	for (UINT32 memOp = 0; memOp < memOperands; memOp++)
 	{
 		if (INS_MemoryOperandIsRead(ins, memOp))
@@ -121,7 +120,7 @@ VOID Trace(TRACE trace, VOID*)
 	}
 }
 
-void Fini(INT32 /*code*/, void* /*v*/)
+void Fini(INT32, void*)
 {
 	PrintWSS("exit");
 }
