@@ -1,0 +1,3 @@
+TEST_TOOL_ROOTS := wss
+TOOL_CXXFLAGS += -std=c++14 -g  
+
