@@ -74,8 +74,9 @@ void PrintMemCounters(const char* reason = "")
 
 	std::ostringstream oss;
 	oss << reason << std::endl;
-	oss << std::setw(12) << std::right << "#reads"
-	    << std::setw(12) << std::right << "#writes"
+	oss << std::setw(12) << std::right << "mem_reads"
+	    << std::setw(12) << std::right << "mem_writes"
+	    << std::setw(12) << std::right << "calls"
 	    << std::setw(6) << " "
 	    << std::left << "function" << std::endl;
 
@@ -83,6 +84,7 @@ void PrintMemCounters(const char* reason = "")
 	{
 		oss << std::setw(12) << std::right << x.mReads
 		    << std::setw(12) << std::right << x.mWrites
+		    << std::setw(12) << std::right << x.mRoutine->mCalls
 		    << std::setw(6) << " "
 		    << std::left << x.mRoutine->mName << std::endl;
 	}
