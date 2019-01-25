@@ -193,7 +193,8 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	PIN_InitSymbols();
+	//PIN_InitSymbols();
+	PIN_InitSymbolsAlt(SYMBOL_INFO_MODE(UINT32(IFUNC_SYMBOLS)));
 
 	stdoutfd = ::dup(1);
 	reads = new AddrRecord[MaxRecords];
