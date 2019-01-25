@@ -1,11 +1,12 @@
 #include "pin.H"
 
 #include <cstdint>
-#include <iostream>
 #include <algorithm>
 #include <deque>
 #include <unordered_map>
+#include <unordered_set>
 #include <sstream>
+#include <iostream>
 
 extern "C"
 {
@@ -43,28 +44,38 @@ int stdoutfd;
 
 void PrintMemCounters(const char* reason = "")
 {
+	static const std::size_t CachelineBytes = 64;
+
 	struct MemCounters
 	{
 		RoutineRecord *mRoutine = nullptr;
 		uint64_t mReads = 0;
 		uint64_t mWrites = 0;
+		std::tr1::unordered_set<void*> mUniqueReads;
+		std::tr1::unordered_set<void*> mUniqueWrites;
 	};
 
 	std::tr1::unordered_map<void*, MemCounters> counters;
 	for (auto it = reads; it < reads + ridx; ++it)
 	{
-		counters[it->mRoutine].mReads += 1;
+		MemCounters& c = counters[it->mRoutine];
+		c.mRoutine = it->mRoutine;
+		c.mReads += 1;
+		c.mUniqueReads.insert((void*)(std::ptrdiff_t(it->mAddr) & (~CachelineBytes)));
 	}
 	for (auto it = writes; it < writes + widx; ++it)
 	{
-		counters[it->mRoutine].mWrites += 1;
+		MemCounters& c = counters[it->mRoutine];
+		c.mRoutine = it->mRoutine;
+		c.mWrites += 1;
+		c.mUniqueWrites.insert((void*)(std::ptrdiff_t(it->mAddr) & (~CachelineBytes)));
 	}
 
 	std::vector<MemCounters> stats;
 	stats.reserve(counters.size());
 	for (const auto& p : counters)
 	{
-		stats.push_back(MemCounters{(RoutineRecord*)p.first, p.second.mReads, p.second.mWrites});
+		stats.push_back(p.second);
 	}
 
 	std::sort(stats.begin(), stats.end(), [](const auto& lhs, const auto& rhs)
