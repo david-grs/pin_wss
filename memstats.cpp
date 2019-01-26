@@ -13,6 +13,14 @@ extern "C"
 #include <unistd.h>
 }
 
+struct MemCounters
+{
+	uint64_t mReads = 0;
+	uint64_t mWrites = 0;
+	std::tr1::unordered_set<void*> mUniqueReads;
+	std::tr1::unordered_set<void*> mUniqueWrites;
+};
+
 struct RoutineRecord
 {
 	RoutineRecord(const std::string& name, ADDRINT addr) :
@@ -23,6 +31,8 @@ struct RoutineRecord
 	ADDRINT mAddr = 0;
 	uint64_t mInstructions = 0;
 	uint64_t mCalls = 0;
+
+	MemCounters mCounters;
 };
 
 struct AddrRecord
@@ -46,41 +56,22 @@ void PrintMemCounters(const char* reason = "")
 {
 	static const std::size_t CachelineBytes = 64;
 
-	struct MemCounters
-	{
-		RoutineRecord *mRoutine = nullptr;
-		uint64_t mReads = 0;
-		uint64_t mWrites = 0;
-		std::tr1::unordered_set<void*> mUniqueReads;
-		std::tr1::unordered_set<void*> mUniqueWrites;
-	};
-
-	std::tr1::unordered_map<void*, MemCounters> counters;
 	for (auto it = reads; it < reads + ridx; ++it)
 	{
-		MemCounters& c = counters[it->mRoutine];
-		c.mRoutine = it->mRoutine;
+		MemCounters& c = it->mRoutine->mCounters;
 		c.mReads += 1;
 		c.mUniqueReads.insert((void*)(std::ptrdiff_t(it->mAddr) & (~CachelineBytes)));
 	}
 	for (auto it = writes; it < writes + widx; ++it)
 	{
-		MemCounters& c = counters[it->mRoutine];
-		c.mRoutine = it->mRoutine;
+		MemCounters& c = it->mRoutine->mCounters;
 		c.mWrites += 1;
 		c.mUniqueWrites.insert((void*)(std::ptrdiff_t(it->mAddr) & (~CachelineBytes)));
 	}
 
-	std::vector<MemCounters> stats;
-	stats.reserve(counters.size());
-	for (const auto& p : counters)
+	std::sort(routines.begin(), routines.end(), [](const auto& lhs, const auto& rhs)
 	{
-		stats.push_back(p.second);
-	}
-
-	std::sort(stats.begin(), stats.end(), [](const auto& lhs, const auto& rhs)
-	{
-		return (lhs.mReads + lhs.mWrites) > (rhs.mReads + rhs.mWrites);
+		return (lhs.mCounters.mReads + lhs.mCounters.mWrites) > (rhs.mCounters.mReads + rhs.mCounters.mWrites);
 	});
 
 	std::ostringstream oss;
@@ -91,13 +82,14 @@ void PrintMemCounters(const char* reason = "")
 	    << std::setw(6) << " "
 	    << std::left << "function" << std::endl;
 
-	for (const auto& x : stats)
+	for (const auto& r : routines)
 	{
-		oss << std::setw(12) << std::right << ((x.mReads * CachelineBytes) / 1024) << "kB"
-		    << std::setw(12) << std::right << ((x.mWrites * CachelineBytes) / 1024) << "kB"
-		    << std::setw(12) << std::right << x.mRoutine->mCalls
+		const MemCounters& c = r.mCounters;
+		oss << std::setw(12) << std::right << ((c.mReads * CachelineBytes) / 1024) << "kB"
+		    << std::setw(12) << std::right << ((c.mWrites * CachelineBytes) / 1024) << "kB"
+		    << std::setw(12) << std::right << r.mCalls
 		    << std::setw(6) << " "
-		    << std::left << x.mRoutine->mName << std::endl;
+		    << std::left << r.mName << std::endl;
 	}
 
 	const std::string str = oss.str();
