@@ -2,7 +2,7 @@
 
 #include <cstdint>
 #include <algorithm>
-#include <deque>
+#include <vector>
 #include <unordered_map>
 #include <unordered_set>
 #include <sstream>
@@ -44,7 +44,7 @@ struct AddrRecord
 static const std::size_t MaxRecords = 256 * 1024 * 1024;
 static const std::size_t MaxInstructions = 4000000000ULL;
 
-std::deque<RoutineRecord> routines;
+std::vector<RoutineRecord*> routines; // Good old vector of pointers - Pin's STL Port is pre-C++11 so no move semantics...
 AddrRecord *reads = nullptr;
 AddrRecord *writes = nullptr;
 uint64_t insn = 0;
@@ -71,7 +71,7 @@ void PrintMemCounters(const char* reason = "")
 
 	std::sort(routines.begin(), routines.end(), [](const auto& lhs, const auto& rhs)
 	{
-		return (lhs.mCounters.mReads + lhs.mCounters.mWrites) > (rhs.mCounters.mReads + rhs.mCounters.mWrites);
+		return (lhs->mCounters.mReads + lhs->mCounters.mWrites) > (rhs->mCounters.mReads + rhs->mCounters.mWrites);
 	});
 
 	std::ostringstream oss;
@@ -84,12 +84,12 @@ void PrintMemCounters(const char* reason = "")
 
 	for (const auto& r : routines)
 	{
-		const MemCounters& c = r.mCounters;
+		const MemCounters& c = r->mCounters;
 		oss << std::setw(12) << std::right << ((c.mReads * CachelineBytes) / 1024) << "kB"
 		    << std::setw(12) << std::right << ((c.mWrites * CachelineBytes) / 1024) << "kB"
-		    << std::setw(12) << std::right << r.mCalls
+		    << std::setw(12) << std::right << r->mCalls
 		    << std::setw(6) << " "
-		    << std::left << r.mName << std::endl;
+		    << std::left << r->mName << std::endl;
 	}
 
 	const std::string str = oss.str();
@@ -141,8 +141,8 @@ ADDRINT CountDown()
 
 VOID Routine(RTN rtn, VOID*)
 {
-	routines.push_back(RoutineRecord{RTN_Name(rtn), RTN_Address(rtn)});
-	RoutineRecord& record = routines.back();
+	routines.push_back(new RoutineRecord{RTN_Name(rtn), RTN_Address(rtn)});
+	RoutineRecord& record = *routines.back();
 
 	RTN_Open(rtn);
 	RTN_InsertCall(rtn, IPOINT_BEFORE, (AFUNPTR)CountInstructionPtr, IARG_PTR, &(record.mCalls), IARG_END);
