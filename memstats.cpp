@@ -45,6 +45,7 @@ static const std::size_t MaxRecords = 256 * 1024 * 1024;
 static const std::size_t MaxInstructions = 4000000000ULL;
 
 std::vector<RoutineRecord*> routines; // Good old vector of pointers - Pin's STL Port is pre-C++11 so no move semantics...
+RoutineRecord* currRoutine = nullptr;
 AddrRecord *reads = nullptr;
 AddrRecord *writes = nullptr;
 uint64_t insn = 0;
@@ -140,17 +141,17 @@ void EarlyExit()
 	PIN_Detach();
 }
 
-void RecordMemRead(RoutineRecord* routine, void* addr)
+void RecordMemRead(void* addr)
 {
 	AddrRecord& record = reads[ridx++];
-	record.mRoutine = routine;
+	record.mRoutine = currRoutine;
 	record.mAddr = addr;
 }
 
-void RecordMemWrite(RoutineRecord* routine, void* addr)
+void RecordMemWrite(void* addr)
 {
 	AddrRecord& record = writes[widx++];
-	record.mRoutine = routine;
+	record.mRoutine = currRoutine;
 	record.mAddr = addr;
 }
 
@@ -167,55 +168,70 @@ VOID Trace(TRACE trace, VOID*)
 	}
 }
 
+ADDRINT MaxCapacity()
+{
+	return insn == MaxInstructions || widx == MaxRecords || ridx == MaxRecords;
+}
+
+void Instruction(INS ins, void*)
+{
+	const UINT32 memOperands = INS_MemoryOperandCount(ins);
+
+	for (UINT32 memOp = 0; memOp < memOperands; memOp++)
+	{
+		if (INS_MemoryOperandIsRead(ins, memOp))
+		{
+			INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)MaxCapacity, IARG_END);
+			INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR)EarlyExit, IARG_END);
+
+			INS_InsertPredicatedCall(
+			    ins, IPOINT_BEFORE, (AFUNPTR)RecordMemRead,
+			    IARG_MEMORYOP_EA, memOp,
+			    IARG_END);
+		}
+
+		if (INS_MemoryOperandIsWritten(ins, memOp))
+		{
+			INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)MaxCapacity, IARG_END);
+			INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR)EarlyExit, IARG_END);
+
+			INS_InsertPredicatedCall(
+			    ins, IPOINT_BEFORE, (AFUNPTR)RecordMemWrite,
+			    IARG_MEMORYOP_EA, memOp,
+			    IARG_END);
+		}
+	}
+}
+
 VOID CountPtr(UINT64 *counter)
 {
 	++(*counter);
 }
 
-ADDRINT CountDown()
+VOID SetRoutinePtr(RoutineRecord* routine)
 {
-	return insn == MaxInstructions || widx == MaxRecords || ridx == MaxRecords;
+	currRoutine = routine;
 }
 
 VOID Routine(RTN rtn, VOID*)
 {
 	routines.push_back(new RoutineRecord{RTN_Name(rtn), RTN_Address(rtn)});
-	RoutineRecord& record = *routines.back();
+	RoutineRecord& routine = *routines.back();
 
 	RTN_Open(rtn);
-	RTN_InsertCall(rtn, IPOINT_BEFORE, (AFUNPTR)CountPtr, IARG_PTR, &(record.mCalls), IARG_END);
+	RTN_InsertCall(rtn, IPOINT_BEFORE, (AFUNPTR)CountPtr, IARG_PTR, &(routine.mCalls), IARG_END);
 
 	for (INS ins = RTN_InsHead(rtn); INS_Valid(ins); ins = INS_Next(ins))
 	{
-		INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)CountPtr, IARG_PTR, &(record.mInstructions), IARG_END);
+		INS_InsertCall(
+		    ins, IPOINT_BEFORE,
+		    (AFUNPTR)CountPtr, IARG_PTR, &(routine.mInstructions),
+		    IARG_END);
 
-		UINT32 memOperands = INS_MemoryOperandCount(ins);
-
-		for (UINT32 memOp = 0; memOp < memOperands; memOp++)
-		{
-			if (INS_MemoryOperandIsRead(ins, memOp))
-			{
-				INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)CountDown, IARG_END);
-				INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR)EarlyExit, IARG_END);
-
-				INS_InsertPredicatedCall(
-				    ins, IPOINT_BEFORE, (AFUNPTR)RecordMemRead,
-				    IARG_PTR, &record,
-				    IARG_MEMORYOP_EA, memOp,
-				    IARG_END);
-			}
-			if (INS_MemoryOperandIsWritten(ins, memOp))
-			{
-				INS_InsertIfCall(ins, IPOINT_BEFORE, (AFUNPTR)CountDown, IARG_END);
-				INS_InsertThenCall(ins, IPOINT_BEFORE, (AFUNPTR)EarlyExit, IARG_END);
-
-				INS_InsertPredicatedCall(
-				    ins, IPOINT_BEFORE, (AFUNPTR)RecordMemWrite,
-				    IARG_PTR, &record,
-				    IARG_MEMORYOP_EA, memOp,
-				    IARG_END);
-			}
-		}
+		INS_InsertCall(
+		    ins, IPOINT_BEFORE, (AFUNPTR)SetRoutinePtr,
+		    IARG_PTR, &routine,
+		    IARG_END);
 	}
 
 	RTN_Close(rtn);
@@ -234,13 +250,14 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	PIN_InitSymbolsAlt(SYMBOL_INFO_MODE(UINT32(IFUNC_SYMBOLS)));
+	PIN_InitSymbols();
 
 	stdoutfd = ::dup(1);
 	reads = new AddrRecord[MaxRecords];
 	writes = new AddrRecord[MaxRecords];
 
 	TRACE_AddInstrumentFunction(Trace, 0);
+	INS_AddInstrumentFunction(Instruction, 0);
 	RTN_AddInstrumentFunction(Routine, 0);
 	PIN_AddFiniFunction(Fini, 0);
 
