@@ -93,8 +93,8 @@ void PrintMemCounters(const char* reason = "")
 
 	for (const auto& x : stats)
 	{
-		oss << std::setw(12) << std::right << x.mReads
-		    << std::setw(12) << std::right << x.mWrites
+		oss << std::setw(12) << std::right << ((x.mReads * CachelineBytes) / 1024) << "kB"
+		    << std::setw(12) << std::right << ((x.mWrites * CachelineBytes) / 1024) << "kB"
 		    << std::setw(12) << std::right << x.mRoutine->mCalls
 		    << std::setw(6) << " "
 		    << std::left << x.mRoutine->mName << std::endl;
