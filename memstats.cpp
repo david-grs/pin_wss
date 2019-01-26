@@ -112,6 +112,7 @@ void PrintMemCounters(const char* reason = "")
 	    << std::setw(Width) << std::right << "WSS (W)"
 	    << std::setw(Width) << std::right << "WSS"
 	    << std::setw(Width) << std::right << "calls"
+	    << std::setw(Width) << std::right << "insn"
 	    << std::setw(Width) << " "
 	    << std::left << "function\n";
 
@@ -124,6 +125,7 @@ void PrintMemCounters(const char* reason = "")
 		    << std::setw(Width) << std::right << Format(c.mUniqueWrites.size() * CachelineBytes, "B")
 		    << std::setw(Width) << std::right << Format(c.mUniqueAccesses.size() * CachelineBytes, "B")
 		    << std::setw(Width) << std::right << r->mCalls
+		    << std::setw(Width) << std::right << r->mInstructions
 		    << std::setw(Width) << " "
 		    << std::left << r->mName << std::endl;
 	}
@@ -165,7 +167,7 @@ VOID Trace(TRACE trace, VOID*)
 	}
 }
 
-VOID CountInstructionPtr(UINT64 *counter)
+VOID CountPtr(UINT64 *counter)
 {
 	++(*counter);
 }
@@ -181,11 +183,11 @@ VOID Routine(RTN rtn, VOID*)
 	RoutineRecord& record = *routines.back();
 
 	RTN_Open(rtn);
-	RTN_InsertCall(rtn, IPOINT_BEFORE, (AFUNPTR)CountInstructionPtr, IARG_PTR, &(record.mCalls), IARG_END);
+	RTN_InsertCall(rtn, IPOINT_BEFORE, (AFUNPTR)CountPtr, IARG_PTR, &(record.mCalls), IARG_END);
 
 	for (INS ins = RTN_InsHead(rtn); INS_Valid(ins); ins = INS_Next(ins))
 	{
-		INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)CountInstructionPtr, IARG_PTR, &(record.mInstructions), IARG_END);
+		INS_InsertCall(ins, IPOINT_BEFORE, (AFUNPTR)CountPtr, IARG_PTR, &(record.mInstructions), IARG_END);
 
 		UINT32 memOperands = INS_MemoryOperandCount(ins);
 
