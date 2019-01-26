@@ -1,9 +1,8 @@
 #include "pin.H"
 
 #include <cstdint>
-#include <algorithm>
 #include <vector>
-#include <unordered_map>
+#include <algorithm>
 #include <unordered_set>
 #include <sstream>
 #include <iostream>
@@ -19,6 +18,7 @@ struct MemCounters
 	uint64_t mWrites = 0;
 	std::tr1::unordered_set<void*> mUniqueReads;
 	std::tr1::unordered_set<void*> mUniqueWrites;
+	std::tr1::unordered_set<void*> mUniqueAccesses; // R+W
 };
 
 struct RoutineRecord
@@ -52,6 +52,29 @@ uint64_t ridx = 0;
 uint64_t widx = 0;
 int stdoutfd;
 
+template <typename T>
+std::string to_string(T&& t)
+{
+	std::stringstream ss;
+	ss << t;
+	return ss.str();
+}
+
+std::string FormatBytes(std::size_t bytes)
+{
+	static const std::size_t kibi = 1024;
+	static const std::size_t mibi = 1024 * 1024;
+	static const std::size_t gibi = 1024 * 1024 * 1024;
+
+	if (bytes < 10 * kibi)
+		return to_string(bytes) + " B";
+	else if (bytes < 10 * mibi)
+		return to_string(bytes / kibi) + " KiB";
+	else if (bytes < 10 * gibi)
+		return to_string(bytes / mibi) + " MiB";
+	return to_string(bytes / mibi) + " GiB";
+}
+
 void PrintMemCounters(const char* reason = "")
 {
 	static const std::size_t CachelineBytes = 64;
@@ -69,26 +92,39 @@ void PrintMemCounters(const char* reason = "")
 		c.mUniqueWrites.insert((void*)(std::ptrdiff_t(it->mAddr) & (~CachelineBytes)));
 	}
 
+	for (auto& r : routines)
+	{
+		MemCounters& c = r->mCounters;
+		c.mUniqueAccesses.insert(c.mUniqueReads.begin(), c.mUniqueReads.end());
+		c.mUniqueAccesses.insert(c.mUniqueWrites.begin(), c.mUniqueWrites.end());
+	}
 	std::sort(routines.begin(), routines.end(), [](const auto& lhs, const auto& rhs)
 	{
 		return (lhs->mCounters.mReads + lhs->mCounters.mWrites) > (rhs->mCounters.mReads + rhs->mCounters.mWrites);
 	});
 
+	static const std::size_t Width = 13;
 	std::ostringstream oss;
-	oss << reason << std::endl;
-	oss << std::setw(12) << std::right << "mem_reads"
-	    << std::setw(12) << std::right << "mem_writes"
-	    << std::setw(12) << std::right << "calls"
-	    << std::setw(6) << " "
-	    << std::left << "function" << std::endl;
+	oss << reason << std::endl
+	    << std::setw(Width) << std::right << "reads"
+	    << std::setw(Width) << std::right << "WSS (R)"
+	    << std::setw(Width) << std::right << "writes"
+	    << std::setw(Width) << std::right << "WSS (W)"
+	    << std::setw(Width) << std::right << "WSS"
+	    << std::setw(Width) << std::right << "calls"
+	    << std::setw(Width) << " "
+	    << std::left << "function\n";
 
 	for (const auto& r : routines)
 	{
 		const MemCounters& c = r->mCounters;
-		oss << std::setw(12) << std::right << ((c.mReads * CachelineBytes) / 1024) << "kB"
-		    << std::setw(12) << std::right << ((c.mWrites * CachelineBytes) / 1024) << "kB"
-		    << std::setw(12) << std::right << r->mCalls
-		    << std::setw(6) << " "
+		oss << std::setw(Width) << std::right << FormatBytes(c.mReads * CachelineBytes)
+		    << std::setw(Width) << std::right << FormatBytes(c.mUniqueReads.size() * CachelineBytes)
+		    << std::setw(Width) << std::right << FormatBytes(c.mWrites * CachelineBytes)
+		    << std::setw(Width) << std::right << FormatBytes(c.mUniqueWrites.size() * CachelineBytes)
+		    << std::setw(Width) << std::right << FormatBytes(c.mUniqueAccesses.size() * CachelineBytes)
+		    << std::setw(Width) << std::right << r->mCalls
+		    << std::setw(Width) << " "
 		    << std::left << r->mName << std::endl;
 	}
 
@@ -196,7 +232,6 @@ int main(int argc, char *argv[])
 		return 1;
 	}
 
-	//PIN_InitSymbols();
 	PIN_InitSymbolsAlt(SYMBOL_INFO_MODE(UINT32(IFUNC_SYMBOLS)));
 
 	stdoutfd = ::dup(1);
@@ -204,7 +239,6 @@ int main(int argc, char *argv[])
 	writes = new AddrRecord[MaxRecords];
 
 	TRACE_AddInstrumentFunction(Trace, 0);
-	//INS_AddInstrumentFunction(Instruction, 0);
 	RTN_AddInstrumentFunction(Routine, 0);
 	PIN_AddFiniFunction(Fini, 0);
 
