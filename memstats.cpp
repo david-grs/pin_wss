@@ -60,19 +60,19 @@ std::string to_string(T&& t)
 	return ss.str();
 }
 
-std::string FormatBytes(std::size_t bytes)
+std::string Format(std::size_t bytes, const std::string& unit = "")
 {
-	static const std::size_t kibi = 1024;
-	static const std::size_t mibi = 1024 * 1024;
-	static const std::size_t gibi = 1024 * 1024 * 1024;
+	static const std::size_t Kibi = 1024;
+	static const std::size_t Mibi = 1024 * 1024;
+	static const std::size_t Gibi = 1024 * 1024 * 1024;
 
-	if (bytes < 10 * kibi)
-		return to_string(bytes) + " B";
-	else if (bytes < 10 * mibi)
-		return to_string(bytes / kibi) + " KiB";
-	else if (bytes < 10 * gibi)
-		return to_string(bytes / mibi) + " MiB";
-	return to_string(bytes / mibi) + " GiB";
+	if (bytes < 10 * Kibi)
+		return to_string(bytes) + (unit.empty() ? "" : " ") + unit;
+	else if (bytes < 10 * Mibi)
+		return to_string(bytes / Kibi) + " Ki" + unit;
+	else if (bytes < 10 * Gibi)
+		return to_string(bytes / Mibi) + " Mi" + unit;
+	return to_string(bytes / Mibi) + " Gi" + unit;
 }
 
 void PrintMemCounters(const char* reason = "")
@@ -118,11 +118,11 @@ void PrintMemCounters(const char* reason = "")
 	for (const auto& r : routines)
 	{
 		const MemCounters& c = r->mCounters;
-		oss << std::setw(Width) << std::right << FormatBytes(c.mReads * CachelineBytes)
-		    << std::setw(Width) << std::right << FormatBytes(c.mUniqueReads.size() * CachelineBytes)
-		    << std::setw(Width) << std::right << FormatBytes(c.mWrites * CachelineBytes)
-		    << std::setw(Width) << std::right << FormatBytes(c.mUniqueWrites.size() * CachelineBytes)
-		    << std::setw(Width) << std::right << FormatBytes(c.mUniqueAccesses.size() * CachelineBytes)
+		oss << std::setw(Width) << std::right << Format(c.mReads * CachelineBytes)
+		    << std::setw(Width) << std::right << Format(c.mUniqueReads.size() * CachelineBytes, "B")
+		    << std::setw(Width) << std::right << Format(c.mWrites * CachelineBytes)
+		    << std::setw(Width) << std::right << Format(c.mUniqueWrites.size() * CachelineBytes, "B")
+		    << std::setw(Width) << std::right << Format(c.mUniqueAccesses.size() * CachelineBytes, "B")
 		    << std::setw(Width) << std::right << r->mCalls
 		    << std::setw(Width) << " "
 		    << std::left << r->mName << std::endl;
