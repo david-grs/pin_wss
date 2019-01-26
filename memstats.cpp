@@ -83,13 +83,13 @@ void PrintMemCounters(const char* reason = "")
 	{
 		MemCounters& c = it->mRoutine->mCounters;
 		c.mReads += 1;
-		c.mUniqueReads.insert((void*)(std::ptrdiff_t(it->mAddr) & (~CachelineBytes)));
+		c.mUniqueReads.insert((void*)(std::ptrdiff_t(it->mAddr) & (~(CachelineBytes - 1))));
 	}
 	for (auto it = writes; it < writes + widx; ++it)
 	{
 		MemCounters& c = it->mRoutine->mCounters;
 		c.mWrites += 1;
-		c.mUniqueWrites.insert((void*)(std::ptrdiff_t(it->mAddr) & (~CachelineBytes)));
+		c.mUniqueWrites.insert((void*)(std::ptrdiff_t(it->mAddr) & (~(CachelineBytes - 1))));
 	}
 
 	for (auto& r : routines)
