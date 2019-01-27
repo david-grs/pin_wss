@@ -55,14 +55,6 @@ inline ADDRINT MaxCapacity()
 	return sInsn == sMaxInstructions || sWidx == sMaxRecords || sRidx == sMaxRecords;
 }
 
-inline void EarlyExit()
-{
-	PIN_Detach();
-
-	Fini();
-	PrintWSS();
-}
-
 inline void CountPtr(UINT64 *counter)
 {
 	++(*counter);

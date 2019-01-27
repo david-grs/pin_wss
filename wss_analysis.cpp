@@ -51,6 +51,15 @@ void Fini()
 	}
 }
 
+void EarlyExit()
+{
+	PIN_Detach();
+
+	std::cout << "Pin: early exit" << std::endl;
+	Fini();
+	PrintWSS();
+}
+
 template <typename T>
 std::string to_string(const T& t)
 {
