@@ -35,6 +35,7 @@ void Fini()
 		c.mReads += 1;
 		c.mUniqueReads.insert((void*)(std::ptrdiff_t(it->mAddr) & (~(sCachelineBytes - 1))));
 	}
+
 	for (auto it = sWrites; it < sWrites + sWidx; ++it)
 	{
 		MemCounters& c = it->mRoutine->mCounters;
@@ -51,7 +52,7 @@ void Fini()
 }
 
 template <typename T>
-std::string to_string(T&& t)
+std::string to_string(const T& t)
 {
 	std::stringstream ss;
 	ss << t;
@@ -70,7 +71,7 @@ std::string Format(std::size_t bytes, const std::string& unit = "")
 		return to_string(bytes / Kibi) + " Ki" + unit;
 	else if (bytes < 10 * Gibi)
 		return to_string(bytes / Mibi) + " Mi" + unit;
-	return to_string(bytes / Mibi) + " Gi" + unit;
+	return to_string(bytes / Gibi) + " Gi" + unit;
 }
 
 void PrintWSS()
