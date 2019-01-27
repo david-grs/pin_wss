@@ -1,2 +1,2 @@
-TEST_TOOL_ROOTS := wss memstats
+TEST_TOOL_ROOTS := wss wss_simple
 TOOL_CXXFLAGS += -std=c++14 -g  
