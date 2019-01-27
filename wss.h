@@ -14,8 +14,6 @@ static const std::size_t sMaxInstructions = 4000000000ULL;
 
 struct MemCounters
 {
-	uint64_t mReads = 0;
-	uint64_t mWrites = 0;
 	std::tr1::unordered_set<void*> mUniqueReads;
 	std::tr1::unordered_set<void*> mUniqueWrites;
 	std::tr1::unordered_set<void*> mUniqueAccesses; // R+W

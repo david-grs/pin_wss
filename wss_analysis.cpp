@@ -32,14 +32,12 @@ void Fini()
 	for (auto it = sReads; it < sReads + sRidx; ++it)
 	{
 		MemCounters& c = it->mRoutine->mCounters;
-		c.mReads += 1;
 		c.mUniqueReads.insert((void*)(std::ptrdiff_t(it->mAddr) & (~(sCachelineBytes - 1))));
 	}
 
 	for (auto it = sWrites; it < sWrites + sWidx; ++it)
 	{
 		MemCounters& c = it->mRoutine->mCounters;
-		c.mWrites += 1;
 		c.mUniqueWrites.insert((void*)(std::ptrdiff_t(it->mAddr) & (~(sCachelineBytes - 1))));
 	}
 
@@ -87,14 +85,12 @@ void PrintWSS()
 {
 	std::sort(sRoutines.begin(), sRoutines.end(), [](const auto& lhs, const auto& rhs)
 	{
-		return (lhs->mCounters.mReads + lhs->mCounters.mWrites) > (rhs->mCounters.mReads + rhs->mCounters.mWrites);
+		return lhs->mCounters.mUniqueAccesses.size() > rhs->mCounters.mUniqueAccesses.size();
 	});
 
 	static const std::size_t Width = 13;
 	std::ostringstream oss;
-	oss << std::setw(Width) << std::right << "reads"
-	    << std::setw(Width) << std::right << "WSS (R)"
-	    << std::setw(Width) << std::right << "writes"
+	oss << std::setw(Width) << std::right << "WSS (R)"
 	    << std::setw(Width) << std::right << "WSS (W)"
 	    << std::setw(Width) << std::right << "WSS"
 	    << std::setw(Width) << std::right << "calls"
@@ -105,9 +101,7 @@ void PrintWSS()
 	for (const auto& r : sRoutines)
 	{
 		const MemCounters& c = r->mCounters;
-		oss << std::setw(Width) << std::right << Format(c.mReads * sCachelineBytes)
-		    << std::setw(Width) << std::right << Format(c.mUniqueReads.size() * sCachelineBytes, "B")
-		    << std::setw(Width) << std::right << Format(c.mWrites * sCachelineBytes)
+		oss << std::setw(Width) << std::right << Format(c.mUniqueReads.size() * sCachelineBytes, "B")
 		    << std::setw(Width) << std::right << Format(c.mUniqueWrites.size() * sCachelineBytes, "B")
 		    << std::setw(Width) << std::right << Format(c.mUniqueAccesses.size() * sCachelineBytes, "B")
 		    << std::setw(Width) << std::right << r->mCalls
