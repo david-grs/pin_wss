@@ -5,12 +5,10 @@
 #include <algorithm>
 #include <unordered_set>
 #include <sstream>
+#include <fstream>
 #include <iostream>
 
-extern "C"
-{
-#include <unistd.h>
-}
+KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "wss.out", "output file");
 
 struct MemCounters
 {
@@ -51,7 +49,7 @@ AddrRecord *writes = nullptr;
 uint64_t insn = 0;
 uint64_t ridx = 0;
 uint64_t widx = 0;
-int stdoutfd;
+std::ofstream ofs;
 
 void PrintWSS(const char* reason = "");
 
@@ -242,8 +240,8 @@ void PrintWSS(const char* reason)
 		    << std::left << r->mName << std::endl;
 	}
 
-	const std::string str = oss.str();
-	::write(stdoutfd, str.c_str(), str.size());
+	ofs << oss.str();
+	ofs.close();
 }
 
 
@@ -257,7 +255,8 @@ int main(int argc, char *argv[])
 
 	PIN_InitSymbols();
 
-	stdoutfd = ::dup(1);
+	ofs.open(KnobOutputFile.Value().c_str());
+
 	reads = new AddrRecord[MaxRecords];
 	writes = new AddrRecord[MaxRecords];
 
