@@ -4,10 +4,7 @@
 
 #include "pin.H"
 
-#include <algorithm>
-#include <sstream>
-#include <fstream>
-#include <iostream>
+#include <string>
 
 KNOB<std::string> KnobOutputFile(KNOB_MODE_WRITEONCE, "pintool", "o", "wss.out", "output file");
 

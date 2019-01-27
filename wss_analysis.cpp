@@ -1,5 +1,11 @@
 #include "wss_analysis.h"
 
+#include <algorithm>
+#include <sstream>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
+
 namespace WSS { namespace Analysis {
 
 static const std::size_t sCachelineBytes = 64;
