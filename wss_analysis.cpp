@@ -99,7 +99,7 @@ void PrintWSS()
 	    << std::setw(Width) << std::right << "WSS"
 	    << std::setw(Width) << std::right << "calls"
 	    << std::setw(Width) << std::right << "insn"
-	    << std::setw(Width) << " "
+	    << std::setw(6) << " "
 	    << std::left << "function\n";
 
 	for (const auto& r : sRoutines)
@@ -112,7 +112,7 @@ void PrintWSS()
 		    << std::setw(Width) << std::right << Format(c.mUniqueAccesses.size() * sCachelineBytes, "B")
 		    << std::setw(Width) << std::right << r->mCalls
 		    << std::setw(Width) << std::right << r->mInstructions
-		    << std::setw(Width) << " "
+		    << std::setw(6) << " "
 		    << std::left << r->mName << std::endl;
 	}
 
