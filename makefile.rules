@@ -1,2 +1,7 @@
 TEST_TOOL_ROOTS := wss wss_simple
+OBJECT_ROOTS := wss wss_analysis.cpp wss_instr.cpp
 TOOL_CXXFLAGS += -std=c++14 -g  
+
+$(OBJDIR)wss$(PINTOOL_SUFFIX): $(OBJDIR)wss$(OBJ_SUFFIX)	$(OBJDIR)wss_analysis$(OBJ_SUFFIX)	$(OBJDIR)wss_instr$(OBJ_SUFFIX)
+	$(LINKER) $(TOOL_LDFLAGS) $(LINK_EXE)$@ $^ $(TOOL_LPATHS) $(TOOL_LIBS) 
+
