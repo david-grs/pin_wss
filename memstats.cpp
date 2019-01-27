@@ -53,91 +53,11 @@ uint64_t ridx = 0;
 uint64_t widx = 0;
 int stdoutfd;
 
-template <typename T>
-std::string to_string(T&& t)
-{
-	std::stringstream ss;
-	ss << t;
-	return ss.str();
-}
-
-std::string Format(std::size_t bytes, const std::string& unit = "")
-{
-	static const std::size_t Kibi = 1024;
-	static const std::size_t Mibi = 1024 * 1024;
-	static const std::size_t Gibi = 1024 * 1024 * 1024;
-
-	if (bytes < 10 * Kibi)
-		return to_string(bytes) + (unit.empty() ? "" : " ") + unit;
-	else if (bytes < 10 * Mibi)
-		return to_string(bytes / Kibi) + " Ki" + unit;
-	else if (bytes < 10 * Gibi)
-		return to_string(bytes / Mibi) + " Mi" + unit;
-	return to_string(bytes / Mibi) + " Gi" + unit;
-}
-
-void PrintMemCounters(const char* reason = "")
-{
-	static const std::size_t CachelineBytes = 64;
-
-	for (auto it = reads; it < reads + ridx; ++it)
-	{
-		MemCounters& c = it->mRoutine->mCounters;
-		c.mReads += 1;
-		c.mUniqueReads.insert((void*)(std::ptrdiff_t(it->mAddr) & (~(CachelineBytes - 1))));
-	}
-	for (auto it = writes; it < writes + widx; ++it)
-	{
-		MemCounters& c = it->mRoutine->mCounters;
-		c.mWrites += 1;
-		c.mUniqueWrites.insert((void*)(std::ptrdiff_t(it->mAddr) & (~(CachelineBytes - 1))));
-	}
-
-	for (auto& r : routines)
-	{
-		MemCounters& c = r->mCounters;
-		c.mUniqueAccesses.insert(c.mUniqueReads.begin(), c.mUniqueReads.end());
-		c.mUniqueAccesses.insert(c.mUniqueWrites.begin(), c.mUniqueWrites.end());
-	}
-	std::sort(routines.begin(), routines.end(), [](const auto& lhs, const auto& rhs)
-	{
-		return (lhs->mCounters.mReads + lhs->mCounters.mWrites) > (rhs->mCounters.mReads + rhs->mCounters.mWrites);
-	});
-
-	static const std::size_t Width = 13;
-	std::ostringstream oss;
-	oss << reason << std::endl
-	    << std::setw(Width) << std::right << "reads"
-	    << std::setw(Width) << std::right << "WSS (R)"
-	    << std::setw(Width) << std::right << "writes"
-	    << std::setw(Width) << std::right << "WSS (W)"
-	    << std::setw(Width) << std::right << "WSS"
-	    << std::setw(Width) << std::right << "calls"
-	    << std::setw(Width) << std::right << "insn"
-	    << std::setw(Width) << " "
-	    << std::left << "function\n";
-
-	for (const auto& r : routines)
-	{
-		const MemCounters& c = r->mCounters;
-		oss << std::setw(Width) << std::right << Format(c.mReads * CachelineBytes)
-		    << std::setw(Width) << std::right << Format(c.mUniqueReads.size() * CachelineBytes, "B")
-		    << std::setw(Width) << std::right << Format(c.mWrites * CachelineBytes)
-		    << std::setw(Width) << std::right << Format(c.mUniqueWrites.size() * CachelineBytes, "B")
-		    << std::setw(Width) << std::right << Format(c.mUniqueAccesses.size() * CachelineBytes, "B")
-		    << std::setw(Width) << std::right << r->mCalls
-		    << std::setw(Width) << std::right << r->mInstructions
-		    << std::setw(Width) << " "
-		    << std::left << r->mName << std::endl;
-	}
-
-	const std::string str = oss.str();
-	::write(stdoutfd, str.c_str(), str.size());
-}
+void PrintWSS(const char* reason = "");
 
 void EarlyExit()
 {
-	PrintMemCounters("early exit");
+	PrintWSS("early exit");
 	PIN_Detach();
 }
 
@@ -239,8 +159,93 @@ VOID Routine(RTN rtn, VOID*)
 
 void Fini(INT32, void*)
 {
-	PrintMemCounters();
+	PrintWSS();
 }
+
+
+
+template <typename T>
+std::string to_string(T&& t)
+{
+	std::stringstream ss;
+	ss << t;
+	return ss.str();
+}
+
+std::string Format(std::size_t bytes, const std::string& unit = "")
+{
+	static const std::size_t Kibi = 1024;
+	static const std::size_t Mibi = 1024 * 1024;
+	static const std::size_t Gibi = 1024 * 1024 * 1024;
+
+	if (bytes < 10 * Kibi)
+		return to_string(bytes) + (unit.empty() ? "" : " ") + unit;
+	else if (bytes < 10 * Mibi)
+		return to_string(bytes / Kibi) + " Ki" + unit;
+	else if (bytes < 10 * Gibi)
+		return to_string(bytes / Mibi) + " Mi" + unit;
+	return to_string(bytes / Mibi) + " Gi" + unit;
+}
+
+void PrintWSS(const char* reason)
+{
+	static const std::size_t CachelineBytes = 64;
+
+	for (auto it = reads; it < reads + ridx; ++it)
+	{
+		MemCounters& c = it->mRoutine->mCounters;
+		c.mReads += 1;
+		c.mUniqueReads.insert((void*)(std::ptrdiff_t(it->mAddr) & (~(CachelineBytes - 1))));
+	}
+	for (auto it = writes; it < writes + widx; ++it)
+	{
+		MemCounters& c = it->mRoutine->mCounters;
+		c.mWrites += 1;
+		c.mUniqueWrites.insert((void*)(std::ptrdiff_t(it->mAddr) & (~(CachelineBytes - 1))));
+	}
+
+	for (auto& r : routines)
+	{
+		MemCounters& c = r->mCounters;
+		c.mUniqueAccesses.insert(c.mUniqueReads.begin(), c.mUniqueReads.end());
+		c.mUniqueAccesses.insert(c.mUniqueWrites.begin(), c.mUniqueWrites.end());
+	}
+	std::sort(routines.begin(), routines.end(), [](const auto& lhs, const auto& rhs)
+	{
+		return (lhs->mCounters.mReads + lhs->mCounters.mWrites) > (rhs->mCounters.mReads + rhs->mCounters.mWrites);
+	});
+
+	static const std::size_t Width = 13;
+	std::ostringstream oss;
+	oss << reason << std::endl
+	    << std::setw(Width) << std::right << "reads"
+	    << std::setw(Width) << std::right << "WSS (R)"
+	    << std::setw(Width) << std::right << "writes"
+	    << std::setw(Width) << std::right << "WSS (W)"
+	    << std::setw(Width) << std::right << "WSS"
+	    << std::setw(Width) << std::right << "calls"
+	    << std::setw(Width) << std::right << "insn"
+	    << std::setw(Width) << " "
+	    << std::left << "function\n";
+
+	for (const auto& r : routines)
+	{
+		const MemCounters& c = r->mCounters;
+		oss << std::setw(Width) << std::right << Format(c.mReads * CachelineBytes)
+		    << std::setw(Width) << std::right << Format(c.mUniqueReads.size() * CachelineBytes, "B")
+		    << std::setw(Width) << std::right << Format(c.mWrites * CachelineBytes)
+		    << std::setw(Width) << std::right << Format(c.mUniqueWrites.size() * CachelineBytes, "B")
+		    << std::setw(Width) << std::right << Format(c.mUniqueAccesses.size() * CachelineBytes, "B")
+		    << std::setw(Width) << std::right << r->mCalls
+		    << std::setw(Width) << std::right << r->mInstructions
+		    << std::setw(Width) << " "
+		    << std::left << r->mName << std::endl;
+	}
+
+	const std::string str = oss.str();
+	::write(stdoutfd, str.c_str(), str.size());
+}
+
 
 int main(int argc, char *argv[])
 {

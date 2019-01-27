@@ -25,29 +25,7 @@ std::size_t ridx = 0;
 std::size_t widx = 0;
 int stdoutfd;
 
-void PrintWSS(const char* reason = "")
-{
-	std::ostringstream oss;
-	oss << reason << std::endl
-	    << insn << " instructions" << std::endl
-	    << (ridx + widx) << " access" << std::endl
-	    << ridx << " reads" << std::endl
-	    << widx << " writes" << std::endl;
-
-	std::tr1::unordered_set<void*> addrs;
-	for (auto it = reads; it < reads + ridx; ++it)
-	{
-		addrs.insert((void*)(std::ptrdiff_t(it->mAddr) & (~63)));
-	}
-	for (auto it = writes; it < writes + widx; ++it)
-	{
-		addrs.insert((void*)(std::ptrdiff_t(it->mAddr) & (~63)));
-	}
-
-	oss << "WSS=" << ((addrs.size() * 64) / 1024) << "kB" << std::endl;
-	const std::string str = oss.str();
-	::write(stdoutfd, str.c_str(), str.size());
-}
+void PrintWSS(const char* reason = "");
 
 void EarlyExit()
 {
@@ -118,6 +96,31 @@ VOID Trace(TRACE trace, VOID*)
 void Fini(INT32, void*)
 {
 	PrintWSS();
+}
+
+
+void PrintWSS(const char* reason)
+{
+	std::ostringstream oss;
+	oss << reason << std::endl
+	    << insn << " instructions" << std::endl
+	    << (ridx + widx) << " access" << std::endl
+	    << ridx << " reads" << std::endl
+	    << widx << " writes" << std::endl;
+
+	std::tr1::unordered_set<void*> addrs;
+	for (auto it = reads; it < reads + ridx; ++it)
+	{
+		addrs.insert((void*)(std::ptrdiff_t(it->mAddr) & (~63)));
+	}
+	for (auto it = writes; it < writes + widx; ++it)
+	{
+		addrs.insert((void*)(std::ptrdiff_t(it->mAddr) & (~63)));
+	}
+
+	oss << "WSS " << ((addrs.size() * 64) / 1024) << "kB" << std::endl;
+	const std::string str = oss.str();
+	::write(stdoutfd, str.c_str(), str.size());
 }
 
 int main(int argc, char *argv[])
