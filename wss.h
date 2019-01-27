@@ -41,6 +41,6 @@ struct AddrRecord
 	void* mAddr = nullptr;
 };
 
-void PrintWSS(const char* reason = "");
+void PrintWSS(const char* reason);
 
 }

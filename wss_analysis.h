@@ -57,9 +57,10 @@ inline ADDRINT MaxCapacity()
 
 inline void EarlyExit()
 {
+	PIN_Detach();
+
 	Fini();
 	PrintWSS();
-	PIN_Detach();
 }
 
 inline void CountPtr(UINT64 *counter)
